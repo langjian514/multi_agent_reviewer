@@ -1,0 +1,32 @@
+# Core Framework
+langgraph>=0.0.20
+langchain>=0.1.0
+langchain-community>=0.0.20
+
+# LLM
+openai>=1.0.0
+
+# FastAPI & WebSocket
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+websockets>=12.0
+sse-starlette>=2.0.0
+
+# Memory
+redis>=5.0.0
+chromadb>=0.4.22
+
+# Task Queue
+celery>=5.3.0
+
+# Utils
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+httpx>=0.26.0
+
+# Observability
+prometheus-client>=0.19.0
+
+# Frontend
+streamlit>=1.30.0
