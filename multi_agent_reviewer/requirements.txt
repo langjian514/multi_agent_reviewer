@@ -1,9 +1,9 @@
-# Core Framework
+﻿# Core Framework
 langgraph>=0.0.20
 langchain>=0.1.0
 langchain-community>=0.0.20
 
-# LLM
+# LLM - Qwen (via OpenAI-compatible API)
 openai>=1.0.0
 
 # FastAPI & WebSocket
@@ -12,9 +12,11 @@ uvicorn[standard]>=0.27.0
 websockets>=12.0
 sse-starlette>=2.0.0
 
+# Vector Store - Milvus
+pymilvus>=2.4.0
+
 # Memory
 redis>=5.0.0
-chromadb>=0.4.22
 
 # Task Queue
 celery>=5.3.0

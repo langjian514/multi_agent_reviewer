@@ -134,22 +134,27 @@ class Orchestrator:
         sufficient_confidence = confidence >= 0.5
         within_retries = state.get("reflection_count", 0) < settings.max_retries
         
-        if no_critical and sufficient_quality and sufficient_confidence and within_retries:
+        # 质量达标 → 直接通过，不重试
+        if no_critical and sufficient_quality and sufficient_confidence:
             state["quality_passed"] = True
             state["needs_retry"] = False
-        else:
+            state["retry_reason"] = None
+        # 质量不达标但还有重试机会 → 重试
+        elif within_retries:
             state["quality_passed"] = False
-            
+            state["needs_retry"] = True
+
             if not no_critical:
                 state["retry_reason"] = f"存在{len(critical)}个严重问题"
             elif not sufficient_quality:
                 state["retry_reason"] = f"质量评分不足 ({quality_score} < {settings.min_quality_score})"
-            elif not sufficient_confidence:
-                state["retry_reason"] = f"置信度过低 ({confidence})"
             else:
-                state["retry_reason"] = "超过最大重试次数"
-            
-            state["needs_retry"] = True
+                state["retry_reason"] = f"置信度过低 ({confidence})"
+        # 质量不达标且已没有重试机会 → 以当前结果结束
+        else:
+            state["quality_passed"] = False
+            state["needs_retry"] = False
+            state["retry_reason"] = "超过最大重试次数，以当前结果为准"
         
         return state
     

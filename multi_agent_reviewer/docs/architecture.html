@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent Code Reviewer — 架构图</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f172a; color: #e2e8f0; padding: 32px 16px;
+  }
+  h1, h2, h3 { letter-spacing: 0.3px; }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  /* === Header === */
+  .header { text-align: center; margin-bottom: 28px; }
+  .header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: #94a3b8; font-size: 14px; margin-top: 6px; }
+
+  /* === Layer title === */
+  .layer-label {
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #64748b; margin: 24px 0 10px 4px;
+  }
+
+  /* === Grid layout === */
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  /* === Card === */
+  .card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    padding: 16px 14px; position: relative; transition: border-color 0.2s, box-shadow 0.2s;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { border-color: #475569; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+  .card .icon { font-size: 22px; margin-bottom: 6px; }
+  .card .name { font-weight: 600; font-size: 14px; }
+  .card .desc { color: #94a3b8; font-size: 12px; margin-top: 3px; line-height: 1.5; }
+
+  /* === Color accents by layer === */
+  .layer-deploy  .card { border-top: 3px solid #38bdf8; }
+  .layer-orch    .card { border-top: 3px solid #a78bfa; }
+  .layer-agent   .card { border-top: 3px solid #f59e0b; }
+  .layer-infra   .card { border-top: 3px solid #34d399; }
+  .layer-data    .card { border-top: 3px solid #f472b6; }
+
+  /* === Pipeline (state machine) === */
+  .pipeline {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    padding: 20px; margin: 8px 0;
+  }
+  .pipeline-row {
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
+  }
+  .pipeline-step {
+    background: #0f172a; border: 1px solid #475569; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; font-weight: 500; text-align: center;
+    min-width: 90px;
+  }
+  .pipeline-step.analyzer   { border-color: #3b82f6; color: #93c5fd; }
+  .pipeline-step.security   { border-color: #ef4444; color: #fca5a5; }
+  .pipeline-step.linter     { border-color: #f59e0b; color: #fcd34d; }
+  .pipeline-step.reviewer   { border-color: #8b5cf6; color: #c4b5fd; }
+  .pipeline-step.reflection { border-color: #10b981; color: #6ee7b7; }
+  .pipeline-arrow { color: #475569; font-size: 18px; }
+  .pipeline-back { color: #92400e; font-size: 13px; font-weight: 600; }
+
+  /* === Badge === */
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px;
+    border-radius: 10px; margin-top: 6px; letter-spacing: 0.3px;
+  }
+  .badge-blue  { background: #1e3a5f; color: #93c5fd; }
+  .badge-green { background: #14532d; color: #6ee7b7; }
+  .badge-amber { background: #451a03; color: #fcd34d; }
+  .badge-red   { background: #450a0a; color: #fca5a5; }
+  .badge-purple{ background: #3b0764; color: #c4b5fd; }
+  .badge-pink  { background: #4c0519; color: #f9a8d4; }
+
+  /* === Data flow arrows === */
+  .flow-section { margin: 14px 0; }
+  .flow-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .flow-item {
+    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+    padding: 5px 10px; font-size: 11px;
+  }
+  .flow-arrow { color: #475569; font-size: 16px; }
+
+  /* === Tech stack === */
+  .tech-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tech-table th, .tech-table td {
+    padding: 8px 10px; text-align: left; border-bottom: 1px solid #1e293b;
+  }
+  .tech-table th { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .tech-table td { color: #cbd5e1; }
+
+  /* === Responsive === */
+  @media (max-width: 768px) {
+    .grid-4, .grid-5, .grid-2, .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .grid-4, .grid-5, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .pipeline-step { min-width: 60px; font-size: 11px; padding: 5px 8px; }
+  }
+
+  hr { border: none; border-top: 1px solid #1e293b; margin: 20px 0; }
+
+  .section-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; color: #e2e8f0; margin: 18px 0 8px;
+  }
+  .section-title .line { flex: 1; height: 1px; background: #1e293b; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ============================================ -->
+  <!-- Header -->
+  <!-- ============================================ -->
+  <div class="header">
+    <h1>🏗️ Multi-Agent Code Reviewer — 系统架构图</h1>
+    <p>四层架构 · 状态机编排 · 规则 + LLM 双轨分析 · Milvus 向量记忆</p>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Layer 1: 部署层 -->
+  <!-- ============================================ -->
+  <div class="layer-label">▸ 部署层 · Docker Compose</div>
+  <div class="grid-4 layer-deploy">
+    <div class="card">
+      <div class="icon">🌐</div>
+      <div class="name">反向代理 (可选)</div>
+      <div class="desc">Nginx / Traefik<br>统一入口 TLS 终止</div>
+      <span class="badge badge-blue">端口 80/443</span>
+    </div>
+    <div class="card">
+      <div class="icon">⚡</div>
+      <div class="name">Backend API</div>
+      <div class="desc">FastAPI + Uvicorn<br>REST + WebSocket 双协议</div>
+      <span class="badge badge-blue">端口 8000</span>
+    </div>
+    <div class="card">
+      <div class="icon">📊</div>
+      <div class="name">Frontend UI</div>
+      <div class="desc">Streamlit 应用<br>实时 Agent 协作可视化</div>
+      <span class="badge badge-blue">端口 8501</span>
+    </div>
+    <div class="card">
+      <div class="icon">🗄️</div>
+      <div class="name">Milvus</div>
+      <div class="desc">向量数据库<br>standalone + etcd + minio</div>
+      <span class="badge badge-blue">端口 19530</span>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Layer 2: 编排层 (LangGraph 状态机) -->
+  <!-- ============================================ -->
+  <div class="layer-label">▸ 编排层 · LangGraph 状态机</div>
+
+  <div class="pipeline">
+    <div class="pipeline-row">
+      <div class="pipeline-step analyzer">📊 Analyzer</div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step security">🔒 Security</div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step linter">📏 Linter</div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step reviewer">📝 Reviewer</div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step reflection">🤔 Reflection</div>
+    </div>
+    <div style="text-align:center;margin-top:10px;">
+      <span class="pipeline-back">⬆ 条件分支：质量不达标 → 回退 Analyzer (最多 3 次) </span>
+      <span style="color:#475569;margin:0 6px;">|</span>
+      <span style="color:#10b981;font-weight:600;">⬇ 质量达标 → Finalize → END</span>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Layer 3: Agent 层 (核心逻辑) -->
+  <!-- ============================================ -->
+  <div class="layer-label">▸ Agent 层 · 规则 + Qwen LLM 双轨</div>
+  <div class="grid-4 layer-agent">
+    <div class="card">
+      <div class="icon">📊</div>
+      <div class="name">AnalyzerAgent</div>
+      <div class="desc">
+        <strong>规则：</strong>正则提取函数/类/依赖，圈复杂度计算<br>
+        <strong>LLM：</strong>Qwen 识别语义弱点、深层架构问题
+      </div>
+      <span class="badge badge-amber">输入: 原始代码</span>
+      <span class="badge badge-green" style="margin-left:4px;">输出: analysis_result</span>
+    </div>
+    <div class="card">
+      <div class="icon">🔒</div>
+      <div class="name">SecurityAgent</div>
+      <div class="desc">
+        <strong>规则：</strong>SQL注入/XSS/命令注入/密钥泄漏/不安全依赖<br>
+        <strong>LLM：</strong>Qwen 发现逻辑漏洞、权限缺陷
+      </div>
+      <span class="badge badge-amber">输入: 原始代码</span>
+      <span class="badge badge-green" style="margin-left:4px;">输出: security_result</span>
+    </div>
+    <div class="card">
+      <div class="icon">📏</div>
+      <div class="name">LinterAgent</div>
+      <div class="desc">
+        <strong>规则：</strong>行长度/命名规范/裸 except/缺少类型注解<br>
+        <strong>LLM：</strong>Qwen 代码质量评级 + 改进建议
+      </div>
+      <span class="badge badge-amber">输入: 原始代码</span>
+      <span class="badge badge-green" style="margin-left:4px;">输出: lint_result</span>
+    </div>
+    <div class="card">
+      <div class="icon">📝</div>
+      <div class="name">ReviewerAgent</div>
+      <div class="desc">
+        <strong>规则：</strong>汇总所有 issues，计算质量评分 &amp; 置信度<br>
+        <strong>LLM：</strong>Qwen 生成中文综合摘要 + 优先级排序
+      </div>
+      <span class="badge badge-amber">输入: 前三 Agent 结果</span>
+      <span class="badge badge-green" style="margin-left:4px;">输出: review_report</span>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- Layer 4: 基础设施层 -->
+  <!-- ============================================ -->
+  <div class="layer-label">▸ 基础设施层 · 外部服务</div>
+  <div class="grid-4 layer-infra">
+    <div class="card">
+      <div class="icon">🧠</div>
+      <div class="name">Qwen LLM</div>
+      <div class="desc">通义千问大模型<br>兼容 OpenAI SDK<br>支持 qwen-plus / qwen-max</div>
+      <span class="badge badge-purple">API: dashscope.aliyuncs.com</span>
+    </div>
+    <div class="card">
+      <div class="icon">🔍</div>
+      <div class="name">Milvus</div>
+      <div class="desc">向量相似度搜索<br>IVF_FLAT 索引 · IP 内积<br>标量字段过滤</div>
+      <span class="badge badge-purple">gRPC: 19530</span>
+    </div>
+    <div class="card">
+      <div class="icon">📈</div>
+      <div class="name">Qwen Embedding</div>
+      <div class="desc">文本向量化<br>text-embedding-v2<br>失败时自动哈希 fallback</div>
+      <span class="badge badge-purple">维度: 1024</span>
+    </div>
+    <div class="card">
+      <div class="icon">⚙️</div>
+      <div class="name">Redis (可选)</div>
+      <div class="desc">任务队列 + 缓存<br>Celery + Redis<br>异步任务调度</div>
+      <span class="badge badge-purple">端口: 6379</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 数据流 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>🔄 请求数据流</span><span class="line"></span>
+  </div>
+
+  <div class="flow-section">
+    <div class="flow-row">
+      <span class="flow-item">🧑‍💻 用户提交代码</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-item">POST /api/review</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-item">BackgroundTask</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-item">Orchestrator.execute()</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-item">LangGraph.ainvoke()</span>
+    </div>
+    <div class="flow-row" style="margin-top:6px;">
+      <span class="flow-arrow">←</span>
+      <span class="flow-item">WebSocket 实时推送</span>
+      <span class="flow-arrow">←</span>
+      <span class="flow-item">Reviewer 生成报告</span>
+      <span class="flow-arrow">←</span>
+      <span class="flow-item">Reflection 质量评估</span>
+      <span class="flow-arrow">←</span>
+      <span class="flow-item">各 Agent 依次执行</span>
+    </div>
+    <div class="flow-row" style="margin-top:6px;">
+      <span class="flow-arrow">↙</span>
+      <span class="flow-item" style="border-color:#10b981;">Milvus 存储记忆</span>
+      <span class="flow-arrow">↘</span>
+      <span class="flow-item" style="border-color:#3b82f6;">Tracer 全链路追踪</span>
+      <span class="flow-arrow">↗</span>
+      <span class="flow-item" style="border-color:#f59e0b;">Fallback 熔断器</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 记忆系统 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>🧠 记忆系统架构</span><span class="line"></span>
+  </div>
+  <div class="grid-2">
+    <div class="card" style="border-top-color:#3b82f6;">
+      <div class="icon">💬</div>
+      <div class="name">ShortTermMemory（短期记忆）</div>
+      <div class="desc">
+        <strong>策略：</strong>滑动窗口（默认 10 条）<br>
+        <strong>功能：</strong>最近对话上下文管理<br>
+        <strong>溢出一半：</strong>自动摘要后移出窗口<br>
+        <strong>实现：</strong>collections.deque(maxlen=N)
+      </div>
+      <span class="badge badge-blue">内存中 · 无持久化</span>
+    </div>
+    <div class="card" style="border-top-color:#34d399;">
+      <div class="icon">🗂️</div>
+      <div class="name">LongTermMemory（长期记忆）</div>
+      <div class="desc">
+        <strong>存储：</strong>Milvus 向量数据库<br>
+        <strong>索引：</strong>IVF_FLAT · IP 内积距离<br>
+        <strong>检索：</strong>相似度 Top-K + 标量过滤<br>
+        <strong>向量：</strong>Qwen Embedding → 1024 维<br>
+        <strong>清理：</strong>超过 30 天自动归档
+      </div>
+      <span class="badge badge-green">持久化 · Docker Volume</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 降级容错 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>🛡️ 降级容错机制</span><span class="line"></span>
+  </div>
+  <div class="grid-3">
+    <div class="card" style="border-top-color:#f59e0b;">
+      <div class="icon">⏱️</div>
+      <div class="name">超时中断</div>
+      <div class="desc">每个 Agent 60s 超时<br>总任务 300s 上限<br>超时 → 走降级策略返回默认值</div>
+    </div>
+    <div class="card" style="border-top-color:#ef4444;">
+      <div class="icon">🔌</div>
+      <div class="name">熔断器</div>
+      <div class="desc">连续 5 次失败 → OPEN<br>60s 后 → HALF_OPEN<br>3 次成功 → CLOSED</div>
+    </div>
+    <div class="card" style="border-top-color:#8b5cf6;">
+      <div class="icon">📋</div>
+      <div class="name">结果兜底</div>
+      <div class="desc">每个 Agent 有预定义 fallback 数据<br>保证下游 Agent 永远收到有效结构<br>不因上游故障连锁崩溃</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 技术栈一览表 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>📦 技术栈</span><span class="line"></span>
+  </div>
+  <table class="tech-table">
+    <thead>
+      <tr><th>类别</th><th>技术</th><th>用途</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>编程语言</td><td>Python 3.13</td><td>全部后端 + Agent 代码</td></tr>
+      <tr><td>框架</td><td>FastAPI · Uvicorn</td><td>REST API + WebSocket 服务器</td></tr>
+      <tr><td>状态机</td><td>LangGraph</td><td>Agent 编排 · 条件分支 · 循环</td></tr>
+      <tr><td>大模型</td><td>Qwen (通义千问) · OpenAI SDK</td><td>深度代码分析 · 报告生成</td></tr>
+      <tr><td>向量数据库</td><td>Milvus 2.4</td><td>长期记忆存储 · 相似度搜索</td></tr>
+      <tr><td>前端</td><td>Streamlit · websocket-client</td><td>可视化 Agent 协作过程</td></tr>
+      <tr><td>可观测性</td><td>全链路 Tracer · AgentMetrics</td><td>Span 追踪 · 成功率/耗时统计</td></tr>
+      <tr><td>部署</td><td>Docker · Docker Compose</td><td>三服务容器化编排</td></tr>
+      <tr><td>任务队列 (可选)</td><td>Celery + Redis</td><td>异步审查任务调度</td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 文件结构 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>📁 项目文件结构</span><span class="line"></span>
+  </div>
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px 20px;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:13px;line-height:1.7;overflow-x:auto;">
+    <span style="color:#38bdf8;">multi_agent_reviewer/</span><br>
+    ├── <span style="color:#e2e8f0;">main.py</span> <span style="color:#64748b;"># Demo 入口</span><br>
+    ├── <span style="color:#e2e8f0;">requirements.txt</span> <span style="color:#64748b;"># Python 依赖</span><br>
+    ├── <span style="color:#e2e8f0;">Dockerfile</span> <span style="color:#64748b;"># 后端镜像</span><br>
+    ├── <span style="color:#e2e8f0;">Dockerfile.frontend</span> <span style="color:#64748b;"># 前端镜像</span><br>
+    ├── <span style="color:#e2e8f0;">docker-compose.yml</span> <span style="color:#64748b;"># 三服务编排</span><br>
+    ├── <span style="color:#e2e8f0;">.env.example</span><br>
+    ├── <span style="color:#e2e8f0;">.dockerignore</span><br>
+    ├── <span style="color:#38bdf8;">config/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   └── <span style="color:#e2e8f0;">settings.py</span> <span style="color:#64748b;"># Qwen + Milvus 全局配置</span><br>
+    ├── <span style="color:#38bdf8;">core/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   ├── <span style="color:#e2e8f0;">state.py</span> <span style="color:#64748b;"># SharedState TypedDict</span><br>
+    │   └── <span style="color:#e2e8f0;">orchestrator.py</span> <span style="color:#64748b;"># LangGraph 状态机构建</span><br>
+    ├── <span style="color:#38bdf8;">agents/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   ├── <span style="color:#e2e8f0;">base.py</span> <span style="color:#64748b;"># BaseAgent + QwenClient</span><br>
+    │   ├── <span style="color:#e2e8f0;">analyzer.py</span> <span style="color:#64748b;"># 代码结构分析</span><br>
+    │   ├── <span style="color:#e2e8f0;">security.py</span> <span style="color:#64748b;"># 安全漏洞扫描</span><br>
+    │   ├── <span style="color:#e2e8f0;">linter.py</span> <span style="color:#64748b;"># 编码规范检查</span><br>
+    │   └── <span style="color:#e2e8f0;">reviewer.py</span> <span style="color:#64748b;"># 汇总报告生成</span><br>
+    ├── <span style="color:#38bdf8;">api/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   └── <span style="color:#e2e8f0;">main.py</span> <span style="color:#64748b;"># FastAPI 路由 + WebSocket</span><br>
+    ├── <span style="color:#38bdf8;">memory/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   └── <span style="color:#e2e8f0;">manager.py</span> <span style="color:#64748b;"># ShortTerm + Milvus LongTerm</span><br>
+    ├── <span style="color:#38bdf8;">tools/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   └── <span style="color:#e2e8f0;">mcp.py</span> <span style="color:#64748b;"># MCP 工具注册表</span><br>
+    ├── <span style="color:#38bdf8;">utils/</span><br>
+    │   ├── <span style="color:#e2e8f0;">__init__.py</span><br>
+    │   ├── <span style="color:#e2e8f0;">tracer.py</span> <span style="color:#64748b;"># 全链路追踪</span><br>
+    │   └── <span style="color:#e2e8f0;">fallback.py</span> <span style="color:#64748b;"># 降级容错</span><br>
+    └── <span style="color:#38bdf8;">frontend/</span><br>
+        └── <span style="color:#e2e8f0;">streamlit_app.py</span> <span style="color:#64748b;"># Streamlit UI</span><br>
+  </div>
+
+  <hr>
+
+  <!-- ============================================ -->
+  <!-- 关键设计决策 -->
+  <!-- ============================================ -->
+  <div class="section-title">
+    <span>⚡ 关键设计决策</span><span class="line"></span>
+  </div>
+  <div class="grid-2">
+    <div class="card" style="border-top-color:#a78bfa;">
+      <div class="icon">1️⃣</div>
+      <div class="name">为什么用 LangGraph 而不是 Chain？</div>
+      <div class="desc">
+        状态机天然支持条件分支（质量是否达标？）、循环（反思重试）、并行（未来可让 Independent Agent 并发执行），且每个节点状态转换清晰可追踪。
+      </div>
+    </div>
+    <div class="card" style="border-top-color:#a78bfa;">
+      <div class="icon">2️⃣</div>
+      <div class="name">为什么规则 + LLM 双轨？</div>
+      <div class="desc">
+        规则保证确定性和速度（正则 1ms 出结果），LLM 提供深度和理解力。LLM 超时或失败时自动降级到纯规则，系统不崩溃。
+      </div>
+    </div>
+    <div class="card" style="border-top-color:#a78bfa;">
+      <div class="icon">3️⃣</div>
+      <div class="name">SharedState 为什么用 TypedDict？</div>
+      <div class="desc">
+        LangGraph 传递的是字典，TypedDict 兼顾 IDE 类型提示和运行时灵活性。每个 Agent 只修改自己负责的 key，减少副作用。
+      </div>
+    </div>
+    <div class="card" style="border-top-color:#a78bfa;">
+      <div class="icon">4️⃣</div>
+      <div class="name">Milvus 相比 ChromaDB 的优势？</div>
+      <div class="desc">
+        生产级分布式向量数据库，支持标量过滤 + 向量混合搜索、IVF/HNSW 多种索引、gRPC 高性能通信，适合大规模记忆检索场景。
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:#475569;font-size:12px;margin:32px 0 16px;">
+    Multi-Agent Code Reviewer · 基于 LangGraph + Qwen + FastAPI + Milvus
+  </div>
+
+</div>
+</body>
+</html>

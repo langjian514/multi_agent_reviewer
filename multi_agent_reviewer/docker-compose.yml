@@ -1,0 +1,73 @@
+﻿# ============================================================
+# Multi-Agent Code Reviewer — Docker 部署
+# ============================================================
+
+services:
+  # ---------- Milvus 向量数据库 ----------
+  milvus:
+    image: milvusdb/milvus:v2.4.0
+    container_name: rag-milvus
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_USE_EMBED: "true"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      COMMON_STORAGETYPE: local
+    volumes:
+      - milvus_data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    networks:
+      - review-net
+    restart: unless-stopped
+
+  # ---------- 后端 FastAPI ----------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-backend
+    env_file:
+      - .env
+    environment:
+      MILVUS_HOST: milvus
+      MILVUS_PORT: "19530"
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      - milvus
+    networks:
+      - review-net
+    restart: unless-stopped
+
+  # ---------- 前端 Streamlit ----------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rag-frontend
+    environment:
+      BACKEND_WS_URL: ws://backend:8000
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    networks:
+      - review-net
+    restart: unless-stopped
+
+volumes:
+  milvus_data:
+    driver: local
+  backend_data:
+    driver: local
+
+networks:
+  review-net:
+    driver: bridge
